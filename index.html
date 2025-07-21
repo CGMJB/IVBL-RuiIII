@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV积分积分处理系统（支持x条件检索）</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- 引入文本编码检测库 -->
+    <script src="https://cdn.jsdelivr.net/npm/jschardet@3.0.0/dist/jschardet.min.js"></script>
+    <style>
+        :root {
+            --primary: #1e3c72;
+            --secondary: #2a5298;
+            --accent: #4a6fc5;
+            --light: #f0f5ff;
+            --dark: #0d1b36;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            color: #212529;
+            padding-bottom: 60px;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 40px 0;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            margin-bottom: 40px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::before {
+            content: "";
+            position: absolute;
+            top: -50px;
+            left: -50px;
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .header::after {
+            content: "";
+            position: absolute;
+            bottom: -80px;
+            right: -80px;
+            width: 250px;
+            height: 250px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .header h1 {
+            font-weight: 700;
+            margin-bottom: 15px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            position: relative;
+            z-index: 1;
+        }
+        
+        .header p {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            max-width: 800px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .card {
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+            border: none;
+            margin-bottom: 30px;
+            transition: transform 0.3s, box-shadow 0.3s;
+            background-color: white;
+            overflow: hidden;
+        }
+        
+        .card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+        }
+        
+        .card-header {
+            background: linear-gradient(45deg, var(--primary), var(--accent));
+            color: white;
+            border-radius: 0 !important;
+            font-weight: 600;
+            padding: 15px 25px;
+            font-size: 1.15rem;
+            border-bottom: none;
+        }
+        
+        .card-body {
+            padding: 30px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            border: none;
+            padding: 12px 28px;
+            font-weight: 600;
+            font-size: 1.05rem;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(30, 60, 114, 0.4);
+            background: linear-gradient(45deg, var(--secondary), var(--accent));
+        }
+        
+        .upload-area {
+            border: 2px dashed var(--accent);
+            border-radius: 12px;
+            padding: 35px;
+            text-align: center;
+            margin: 25px 0;
+            background-color: rgba(240, 245, 255, 0.5);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            background-color: rgba(234, 241, 255, 0.8);
+            transform: scale(1.02);
+            border-color: var(--secondary);
+        }
+        
+        .upload-icon {
+            font-size: 4rem;
+            color: var(--accent);
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+        
+        .upload-area:hover .upload-icon {
+            transform: scale(1.1);
+            color: var(--secondary);
+        }
+        
+        .preview-table {
+            max-height: 350px;
+            overflow-y: auto;
+            margin: 25px 0;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .preview-table table {
+            margin-bottom: 0;
+        }
+        
+        .preview-table th {
+            background-color: var(--light);
+            position: sticky;
+            top: 0;
+            font-weight: 600;
+        }
+        
+        .result-container {
+            display: none;
+        }
+        
+        .result-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+            border-left: 4px solid var(--accent);
+        }
+        
+        .team-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f5f9ff 100%);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e9ecef;
+        }
+        
+        .team-rank {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            font-weight: bold;
+            margin-right: 15px;
+            font-size: 18px;
+        }
+        
+        .feature-icon {
+            font-size: 2.8rem;
+            color: var(--accent);
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+        
+        .feature-icon:hover {
+            transform: scale(1.1);
+        }
+        
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            color: white;
+            border-radius: 50%;
+            font-weight: bold;
+            margin-right: 15px;
+            font-size: 18px;
+        }
+        
+        .footer {
+            background: linear-gradient(45deg, var(--dark), #1a2b4d);
+            color: white;
+            padding: 40px 0 30px;
+            margin-top: 60px;
+            position: relative;
+        }
+        
+        .footer::before {
+            content: "";
+            position: absolute;
+            top: -20px;
+            left: 0;
+            right: 0;
+            height: 20px;
+            background: linear-gradient(to bottom, transparent, rgba(26, 43, 77, 0.8));
+        }
+        
+        .highlight {
+            background-color: rgba(255, 255, 0, 0.2);
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        
+        .rule-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            margin-right: 8px;
+        }
+        
+        .rule-1 {
+            background-color: rgba(40, 167, 69, 0.15);
+            color: var(--success);
+        }
+        
+        .rule-2 {
+            background-color: rgba(255, 193, 7, 0.15);
+            color: var(--warning);
+        }
+        
+        .rule-3 {
+            background-color: rgba(220, 53, 69, 0.15);
+            color: var(--danger);
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .stats-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+            margin: 10px 0;
+        }
+        
+        .stats-label {
+            font-size: 1rem;
+            color: #6c757d;
+        }
+        
+        .section-title {
+            position: relative;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            font-weight: 700;
+        }
+        
+        .section-title::after {
+            content: "";
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 4px;
+            background: linear-gradient(45deg, var(--primary), var(--accent));
+            border-radius: 2px;
+        }
+        
+        .file-name {
+            font-weight: 600;
+            color: var(--primary);
+            word-break: break-all;
+            background-color: rgba(30, 60, 114, 0.05);
+            padding: 8px 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        
+        .encoding-selector {
+            margin-top: 20px;
+            margin-bottom: 15px;
+            padding: 8px 15px;
+            border-radius: 8px;
+            border: 1px solid #ced4da;
+            background-color: white;
+            width: 100%;
+        }
+        
+        .encoding-label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        .encoding-hint {
+            background-color: #e7f4ff;
+            padding: 12px 15px;
+            border-radius: 8px;
+            border-left: 4px solid #1e3c72;
+            margin-top: 15px;
+        }
+        
+        .detected-encoding {
+            display: inline-block;
+            margin-left: 10px;
+            padding: 3px 10px;
+            background-color: #e3f2fd;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: #0d47a1;
+        }
+        
+        .empty-cell {
+            color: #6c757d;
+            font-style: italic;
+        }
+        
+        @media (max-width: 768px) {
+            .header {
+                padding: 30px 0;
+            }
+            
+            .header h1 {
+                font-size: 1.8rem;
+            }
+            
+            .header p {
+                font-size: 1.1rem;
+            }
+            
+            .card-body {
+                padding: 20px;
+            }
+            
+            .upload-area {
+                padding: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1><i class="fas fa-calculator me-3"></i>CSV积分处理系统</h1>
+            <p>上传CSV文件，在浏览器中自动计算队伍积分并生成排名结果 - 支持<span class="highlight">"x"条件检索</span></p>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="row">
+            <!-- 左侧上传区域 -->
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-file-upload me-2"></i>上传CSV文件
+                    </div>
+                    <div class="card-body">
+                        <div class="upload-area" id="dropZone">
+                            <div class="upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <h4>拖放CSV文件到此处</h4>
+                            <p class="text-muted">或点击选择文件</p>
+                            <input type="file" id="csvFile" class="d-none" accept=".csv">
+                            <button class="btn btn-primary mt-3" id="browseBtn">
+                                <i class="fas fa-folder-open me-2"></i>浏览文件
+                            </button>
+                        </div>
+                        
+                        <!-- 编码选择器，解决中文乱码问题 -->
+                        <div class="mt-4">
+                            <label class="encoding-label">文件编码：
+                                <span id="detectedEncoding" class="detected-encoding"></span>
+                            </label>
+                            <select id="encodingSelector" class="encoding-selector">
+                                <option value="utf-8">UTF-8（推荐，Notion常用）</option>
+                                <option value="utf-8-bom">UTF-8 with BOM</option>
+                                <option value="gbk">GBK/GB2312（中文常用）</option>
+                                <option value="big5">Big5（繁体中文）</option>
+                                <option value="shift_jis">Shift-JIS（日文）</option>
+                            </select>
+                            <div class="encoding-hint">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>编码提示：</strong>
+                                Notion导出的CSV通常使用UTF-8编码。系统会自动检测编码，如仍有乱码，请尝试其他编码格式。
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-primary">
+                            <i class="fas fa-info-circle me-2"></i>
+                            CSV文件应包含以下列：队伍A, 队伍B, M, N, O, P, <span class="highlight">Q(x条件)</span>, R, S
+                        </div>
+                        
+                        <div id="fileInfo" class="d-none">
+                            <h5>已选文件：</h5>
+                            <div class="file-name" id="fileName"></div>
+                        </div>
+                        
+                        <div class="d-grid mt-3">
+                            <button class="btn btn-primary btn-lg" id="processBtn" disabled>
+                                <i class="fas fa-cogs me-2"></i>处理数据
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-table me-2"></i>数据预览
+                    </div>
+                    <div class="card-body">
+                        <div class="preview-table" id="previewContainer">
+                            <p class="text-center text-muted py-5">上传CSV文件后，数据预览将显示在这里</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-list-ol me-2"></i>使用步骤
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-4">
+                            <span class="step-number">1</span>
+                            <div>
+                                <h5 class="mb-1">上传CSV文件</h5>
+                                <p class="mb-0">点击"浏览文件"或拖放CSV文件到上传区域</p>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex align-items-center mb-4">
+                            <span class="step-number">2</span>
+                            <div>
+                                <h5 class="mb-1">确认编码</h5>
+                                <p class="mb-0">系统会自动检测编码，必要时可手动调整</p>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex align-items-center mb-4">
+                            <span class="step-number">3</span>
+                            <div>
+                                <h5 class="mb-1">处理数据</h5>
+                                <p class="mb-0">点击"处理数据"按钮计算积分和排名</p>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex align-items-center">
+                            <span class="step-number">4</span>
+                            <div>
+                                <h5 class="mb-1">查看并导出结果</h5>
+                                <p class="mb-0">查看结果并导出Excel文件</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 右侧结果区域 -->
+            <div class="col-lg-6">
+                <div class="card result-container" id="resultCard">
+                    <div class="card-header">
+                        <i class="fas fa-chart-line me-2"></i>处理结果
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <div class="stats-card">
+                                    <i class="fas fa-file-csv text-primary"></i>
+                                    <div class="stats-value" id="rowCount">0</div>
+                                    <div class="stats-label">数据行数</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stats-card">
+                                    <i class="fas fa-users text-success"></i>
+                                    <div class="stats-value" id="teamCount">0</div>
+                                    <div class="stats-label">队伍数量</div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="stats-card">
+                                    <i class="fas fa-gamepad text-warning"></i>
+                                    <div class="stats-value" id="matchCount">0</div>
+                                    <div class="stats-label">比赛场次</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h5 class="section-title"><i class="fas fa-trophy me-2"></i>队伍排名</h5>
+                        <div id="rankingContainer" class="mb-4">
+                            <!-- 排名将通过JavaScript动态生成 -->
+                        </div>
+                        
+                        <div class="d-grid gap-2 mt-4">
+                            <button class="btn btn-primary btn-lg" id="exportExcel">
+                                <i class="fas fa-file-excel me-2"></i>导出Excel文件
+                            </button>
+                            <button class="btn btn-outline-primary" id="resetBtn">
+                                <i class="fas fa-redo me-2"></i>处理新文件
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card result-card">
+                    <div class="card-header">
+                        <i class="fas fa-info-circle me-2"></i>积分计算规则
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item">
+                                <span class="rule-badge rule-1">规则1</span>
+                                <strong>比较M和N列：</strong> 数值大的一方获得1积分，同时计算净胜值
+                            </li>
+                            <li class="list-group-item">
+                                <span class="rule-badge rule-2">规则2</span>
+                                <strong>若M=N：</strong> 比较O和P列，数值大的一方获得1积分
+                            </li>
+                            <li class="list-group-item">
+                                <span class="rule-badge rule-3">规则3</span>
+                                <strong>若O=P：</strong> 检查Q列：
+                                <ul class="mt-2">
+                                    <li>若Q包含<span class="highlight">"x"</span>，则R和S中数值小的一方获得1积分</li>
+                                    <li>否则，R和S中数值大的一方获得1积分</li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-star me-2"></i>系统特点
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-md-4 mb-4">
+                                <div class="feature-icon">
+                                    <i class="fas fa-lock"></i>
+                                </div>
+                                <h5>隐私保护</h5>
+                                <p class="small mb-0">数据仅在浏览器中处理，不会上传到任何服务器</p>
+                            </div>
+                            <div class="col-md-4 mb-4">
+                                <div class="feature-icon">
+                                    <i class="fas fa-language"></i>
+                                </div>
+                                <h5>完美中文支持</h5>
+                                <p class="small mb-0">自动检测编码，解决Notion CSV中文乱码</p>
+                            </div>
+                            <div class="col-md-4 mb-4">
+                                <div class="feature-icon">
+                                    <i class="fas fa-file-excel"></i>
+                                </div>
+                                <h5>Excel导出</h5>
+                                <p class="small mb-0">一键导出专业格式的Excel文件</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <div class="container text-center">
+            <h4>CSV积分处理系统</h4>
+            <p>支持"x"条件检索 &copy; 2023 - 基于HTML5和JavaScript构建</p>
+            <p class="mb-0">优化Notion CSV处理，完美解决中文乱码问题</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 元素引用
+            const dropZone = document.getElementById('dropZone');
+            const csvFileInput = document.getElementById('csvFile');
+            const browseBtn = document.getElementById('browseBtn');
+            const processBtn = document.getElementById('processBtn');
+            const previewContainer = document.getElementById('previewContainer');
+            const resultCard = document.getElementById('resultCard');
+            const rankingContainer = document.getElementById('rankingContainer');
+            const exportExcelBtn = document.getElementById('exportExcel');
+            const resetBtn = document.getElementById('resetBtn');
+            const rowCountSpan = document.getElementById('rowCount');
+            const teamCountSpan = document.getElementById('teamCount');
+            const matchCountSpan = document.getElementById('matchCount');
+            const fileName = document.getElementById('fileName');
+            const fileInfo = document.getElementById('fileInfo');
+            const encodingSelector = document.getElementById('encodingSelector');
+            const detectedEncodingEl = document.getElementById('detectedEncoding');
+            
+            let csvData = [];
+            let processedData = [];
+            let teamStats = {};
+            let fileContent = null;
+            
+            // 事件监听器
+            browseBtn.addEventListener('click', () => csvFileInput.click());
+            csvFileInput.addEventListener('change', handleFileSelect);
+            processBtn.addEventListener('click', processData);
+            exportExcelBtn.addEventListener('click', exportToExcel);
+            resetBtn.addEventListener('click', resetApp);
+            encodingSelector.addEventListener('change', () => {
+                if (fileContent) {
+                    parseCSV(fileContent);
+                }
+            });
+            
+            // 拖放功能
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropZone.addEventListener(eventName, highlight, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropZone.addEventListener(eventName, unhighlight, false);
+            });
+            
+            function highlight() {
+                dropZone.style.backgroundColor = 'rgba(74, 111, 197, 0.15)';
+                dropZone.style.borderColor = '#1e3c72';
+            }
+            
+            function unhighlight() {
+                dropZone.style.backgroundColor = 'rgba(240, 245, 255, 0.5)';
+                dropZone.style.borderColor = '#4a6fc5';
+            }
+            
+            dropZone.addEventListener('drop', handleDrop, false);
+            
+            function handleDrop(e) {
+                const dt = e.dataTransfer;
+                const file = dt.files[0];
+                handleFile(file);
+            }
+            
+            function handleFileSelect(e) {
+                const file = e.target.files[0];
+                handleFile(file);
+            }
+            
+            function handleFile(file) {
+                if (!file) return;
+                
+                // 显示文件名
+                fileName.textContent = file.name;
+                fileInfo.classList.remove('d-none');
+                
+                // 先以二进制方式读取文件以检测编码
+                const binaryReader = new FileReader();
+                binaryReader.onload = function(e) {
+                    // 检测文件编码
+                    const result = e.target.result;
+                    const detection = jschardet.detect(result);
+                    const confidence = Math.round(detection.confidence * 100);
+                    
+                    // 显示检测到的编码
+                    detectedEncodingEl.textContent = 
+                        `${detection.encoding} (可信度: ${confidence}%)`;
+                    
+                    // 如果可信度高，自动选择检测到的编码
+                    if (detection.confidence > 0.7) {
+                        const encoding = detection.encoding.toLowerCase();
+                        // 映射常见编码名称到FileReader支持的编码
+                        const encodingMap = {
+                            'utf-8': 'utf-8',
+                            'utf-8 bom': 'utf-8-bom',
+                            'windows-1252': 'windows-1252',
+                            'gb2312': 'gbk',
+                            'gbk': 'gbk',
+                            'big5': 'big5',
+                            'shift_jis': 'shift_jis'
+                        };
+                        
+                        if (encodingMap[encoding]) {
+                            encodingSelector.value = encodingMap[encoding];
+                        }
+                    }
+                    
+                    // 保存二进制内容以便后续重新解析
+                    fileContent = result;
+                    
+                    // 使用选择的编码解析文件
+                    parseCSVWithEncoding(result, encodingSelector.value);
+                };
+                
+                binaryReader.readAsArrayBuffer(file);
+            }
+            
+            // 使用指定编码解析CSV
+            function parseCSVWithEncoding(arrayBuffer, encoding) {
+                try {
+                    // 将ArrayBuffer转换为Uint8Array
+                    let uint8Array = new Uint8Array(arrayBuffer);
+                    
+                    // 处理UTF-8 BOM
+                    if (encoding === 'utf-8-bom' && uint8Array.length >= 3 && 
+                        uint8Array[0] === 0xEF && uint8Array[1] === 0xBB && uint8Array[2] === 0xBF) {
+                        // 移除BOM头
+                        uint8Array = uint8Array.subarray(3);
+                    }
+                    
+                    // 创建TextDecoder进行解码
+                    const decoder = new TextDecoder(encoding);
+                    const content = decoder.decode(uint8Array);
+                    
+                    parseCSV(content);
+                } catch (error) {
+                    console.error('编码解析错误:', error);
+                    alert(`使用 ${encoding} 编码解析文件失败: ${error.message}\n请尝试其他编码格式`);
+                }
+            }
+            
+            function parseCSV(content) {
+                // 处理不同操作系统的换行符
+                const rows = content.split(/\r\n|\n|\r/);
+                if (rows.length === 0) {
+                    alert('CSV文件为空或格式不正确');
+                    return;
+                }
+                
+                // 解析表头
+                const headers = parseCSVRow(rows[0]).map(h => h.trim());
+                
+                // 验证列数
+                if (headers.length < 19) {
+                    alert('CSV文件列数不足。请确保文件包含至少19列数据。');
+                    return;
+                }
+                
+                csvData = [];
+                
+                // 解析数据行
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i].trim();
+                    if (row === '') continue;
+                    
+                    const cols = parseCSVRow(row);
+                    if (cols.length >= 19) {
+                        // 对于数值列，只在有值时才转换为数字，否则保留null
+                        csvData.push({
+                            teamA: cols[2] || '',
+                            teamB: cols[3] || '',
+                            m: cols[12] ? parseFloat(cols[12]) : null,
+                            n: cols[13] ? parseFloat(cols[13]) : null,
+                            o: cols[14] ? parseFloat(cols[14]) : null,
+                            p: cols[15] ? parseFloat(cols[15]) : null,
+                            q: cols[16] || '',
+                            r: cols[17] ? parseFloat(cols[17]) : null,
+                            s: cols[18] ? parseFloat(cols[18]) : null
+                        });
+                    }
+                }
+                
+                if (csvData.length > 0) {
+                    displayPreview();
+                    processBtn.disabled = false;
+                } else {
+                    alert('未找到有效数据。请检查CSV文件格式。');
+                }
+            }
+            
+            // 改进的CSV行解析函数，支持带引号的字段
+            function parseCSVRow(row) {
+                const cols = [];
+                let current = '';
+                let inQuotes = false;
+                
+                for (let i = 0; i < row.length; i++) {
+                    const char = row[i];
+                    
+                    if (char === '"') {
+                        // 检查是否是转义的引号("")
+                        if (i + 1 < row.length && row[i + 1] === '"') {
+                            current += '"';
+                            i++; // 跳过下一个引号
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        cols.push(current);
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                
+                // 添加最后一列
+                cols.push(current);
+                
+                return cols;
+            }
+            
+            function displayPreview() {
+                let tableHTML = `
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>队伍A</th>
+                                <th>队伍B</th>
+                                <th>M</th>
+                                <th>N</th>
+                                <th>O</th>
+                                <th>P</th>
+                                <th>Q</th>
+                                <th>R</th>
+                                <th>S</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                // 仅显示前10行预览
+                const previewRows = csvData.slice(0, 10);
+                previewRows.forEach(row => {
+                    // 使用escapeHtml防止XSS并确保中文正确显示
+                    tableHTML += `
+                        <tr>
+                            <td>${escapeHtml(row.teamA)}</td>
+                            <td>${escapeHtml(row.teamB)}</td>
+                            <td>${row.m !== null ? row.m : '<span class="empty-cell">无数据</span>'}</td>
+                            <td>${row.n !== null ? row.n : '<span class="empty-cell">无数据</span>'}</td>
+                            <td>${row.o !== null ? row.o : '<span class="empty-cell">无数据</span>'}</td>
+                            <td>${row.p !== null ? row.p : '<span class="empty-cell">无数据</span>'}</td>
+                            <td>${escapeHtml(row.q)}</td>
+                            <td>${row.r !== null ? row.r : '<span class="empty-cell">无数据</span>'}</td>
+                            <td>${row.s !== null ? row.s : '<span class="empty-cell">无数据</span>'}</td>
+                        </tr>
+                    `;
+                });
+                
+                tableHTML += `</tbody></table>`;
+                
+                if (csvData.length > 10) {
+                    tableHTML += `<div class="text-center py-3 bg-light">显示前10行，共${csvData.length}行数据</div>`;
+                }
+                
+                previewContainer.innerHTML = tableHTML;
+            }
+            
+            // 防XSS处理函数，确保中文正确显示
+            function escapeHtml(unsafe) {
+                if (!unsafe) return '';
+                return unsafe
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+            
+            function processData() {
+                processedData = [];
+                teamStats = {};
+                const invalidRows = [];
+                
+                // 处理每一行数据
+                csvData.forEach((row, index) => {
+                    // 检查必要的数值字段是否存在
+                    const requiredFields = ['m', 'n', 'o', 'p', 'r', 's'];
+                    const missingFields = requiredFields.filter(field => row[field] === null);
+                    
+                    if (missingFields.length > 0) {
+                        invalidRows.push({
+                            rowIndex: index + 1,
+                            missingFields: missingFields
+                        });
+                        return; // 跳过处理此行数据
+                    }
+                    
+                    let scoreA = 0;
+                    let scoreB = 0;
+                    let netA = 0;
+                    let netB = 0;
+                    let ruleUsed = 1;
+                    
+                    // 规则1: 比较M和N
+                    if (row.m !== row.n) {
+                        if (row.m > row.n) {
+                            scoreA = 1;
+                            netA = row.m - row.n;
+                            netB = -(row.m - row.n);
+                        } else {
+                            scoreB = 1;
+                            netB = row.n - row.m;
+                            netA = -(row.n - row.m);
+                        }
+                    }
+                    // 规则2: M等于N时比较O和P
+                    else if (row.o !== row.p) {
+                        ruleUsed = 2;
+                        if (row.o > row.p) {
+                            scoreA = 1;
+                        } else {
+                            scoreB = 1;
+                        }
+                    }
+                    // 规则3: O等于P时处理Q,R,S
+                    else {
+                        ruleUsed = 3;
+                        if (row.q.toLowerCase().includes("x")) {
+                            // x规则: 小的一方得1分
+                            if (row.r < row.s) {
+                                scoreA = 1;
+                            } else if (row.r > row.s) {
+                                scoreB = 1;
+                            }
+                        } else {
+                            // 非x规则: 大的一方得1分
+                            if (row.r > row.s) {
+                                scoreA = 1;
+                            } else if (row.r < row.s) {
+                                scoreB = 1;
+                            }
+                        }
+                    }
+                    
+                    // 保存处理后的数据
+                    processedData.push({
+                        teamA: row.teamA,
+                        teamB: row.teamB,
+                        scoreA: scoreA,
+                        netA: netA,
+                        scoreB: scoreB,
+                        netB: netB,
+                        ruleUsed: ruleUsed
+                    });
+                    
+                    // 更新队伍统计
+                    updateTeamStats(row.teamA, scoreA, netA);
+                    updateTeamStats(row.teamB, scoreB, netB);
+                });
+                
+                // 显示无效行警告
+                if (invalidRows.length > 0) {
+                    let warningMessage = `发现${invalidRows.length}行数据不完整，已跳过处理：\n`;
+                    invalidRows.forEach(item => {
+                        warningMessage += `第${item.rowIndex}行: 缺少${item.missingFields.join(', ')}字段数据\n`;
+                    });
+                    alert(warningMessage);
+                }
+                
+                displayResults();
+            }
+            
+            function updateTeamStats(teamName, score, net) {
+                if (!teamName) return;
+                
+                if (!teamStats[teamName]) {
+                    teamStats[teamName] = {
+                        score: 0,
+                        net: 0,
+                        games: 0
+                    };
+                }
+                
+                teamStats[teamName].score += score;
+                teamStats[teamName].net += net;
+                teamStats[teamName].games += 1;
+            }
+            
+            function displayResults() {
+                // 准备排名数据
+                const rankingData = [];
+                for (const [team, stats] of Object.entries(teamStats)) {
+                    rankingData.push({
+                        team: team,
+                        score: stats.score,
+                        net: stats.net,
+                        games: stats.games
+                    });
+                }
+                
+                // 按积分和净胜分排序
+                rankingData.sort((a, b) => {
+                    if (b.score !== a.score) return b.score - a.score;
+                    return b.net - a.net;
+                });
+                
+                // 显示统计信息
+                rowCountSpan.textContent = csvData.length;
+                teamCountSpan.textContent = rankingData.length;
+                matchCountSpan.textContent = processedData.length; // 只统计有效处理的比赛场次
+                
+                // 生成排名HTML
+                let rankingHTML = '<div class="table-responsive"><table class="table table-hover align-middle">';
+                rankingHTML += `
+                    <thead class="table-light">
+                        <tr>
+                            <th>排名</th>
+                            <th>队伍名称</th>
+                            <th>总积分</th>
+                            <th>总净胜分</th>
+                            <th>参赛场次</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                `;
+                
+                rankingData.forEach((team, index) => {
+                    rankingHTML += `
+                        <tr>
+                            <td><span class="badge bg-primary rounded-pill">${index + 1}</span></td>
+                            <td><strong>${escapeHtml(team.team)}</strong></td>
+                            <td class="fw-bold">${team.score}</td>
+                            <td class="${team.net >= 0 ? 'text-success fw-bold' : 'text-danger'}">${team.net.toFixed(2)}</td>
+                            <td>${team.games}</td>
+                        </tr>
+                    `;
+                });
+                
+                rankingHTML += '</tbody></table></div>';
+                rankingContainer.innerHTML = rankingHTML;
+                
+                // 显示结果区域
+                resultCard.style.display = 'block';
+                
+                // 滚动到结果区域
+                resultCard.scrollIntoView({ behavior: 'smooth' });
+            }
+            
+            function exportToExcel() {
+                // 创建工作簿
+                const wb = XLSX.utils.book_new();
+                
+                // 添加详细数据表
+                const detailData = processedData.map(row => ({
+                    '队伍A': row.teamA,
+                    '队伍B': row.teamB,
+                    '积分A': row.scoreA,
+                    '净胜A': row.netA,
+                    '积分B': row.scoreB,
+                    '净胜B': row.netB,
+                    '使用规则': `规则${row.ruleUsed}`
+                }));
+                
+                const detailWs = XLSX.utils.json_to_sheet(detailData);
+                XLSX.utils.book_append_sheet(wb, detailWs, '详细数据');
+                
+                // 添加排名表
+                const rankingData = [];
+                
+                // 准备排名数据（按积分和净胜分排序）
+                const sortedTeams = Object.entries(teamStats)
+                    .map(([team, stats]) => ({ team, ...stats }))
+                    .sort((a, b) => {
+                        if (b.score !== a.score) return b.score - a.score;
+                        return b.net - a.net;
+                    });
+                
+                sortedTeams.forEach((team, index) => {
+                    rankingData.push({
+                        '排名': index + 1,
+                        '队伍名称': team.team,
+                        '总积分': team.score,
+                        '总净胜分': team.net,
+                        '参赛场次': team.games
+                    });
+                });
+                
+                const rankingWs = XLSX.utils.json_to_sheet(rankingData);
+                XLSX.utils.book_append_sheet(wb, rankingWs, '队伍排名');
+                
+                // 导出Excel文件
+                XLSX.writeFile(wb, '积分排名结果.xlsx');
+            }
+            
+            function resetApp() {
+                csvFileInput.value = '';
+                processBtn.disabled = true;
+                previewContainer.innerHTML = '<p class="text-center text-muted py-5">上传CSV文件后，数据预览将显示在这里</p>';
+                resultCard.style.display = 'none';
+                csvData = [];
+                processedData = [];
+                teamStats = {};
+                fileInfo.classList.add('d-none');
+                fileContent = null;
+                detectedEncodingEl.textContent = '';
+            }
+        });
+    </script>
+</body>
+</html>
+    
