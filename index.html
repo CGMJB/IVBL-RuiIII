@@ -368,6 +368,10 @@
             font-style: italic;
         }
         
+        .warning-row {
+            background-color: rgba(255, 193, 7, 0.1);
+        }
+        
         @media (max-width: 768px) {
             .header {
                 padding: 30px 0;
@@ -442,6 +446,7 @@
                         <div class="alert alert-primary">
                             <i class="fas fa-info-circle me-2"></i>
                             CSV文件应包含以下列：队伍A, 队伍B, M, N, O, P, <span class="highlight">Q(x条件)</span>, R, S
+                            <br><strong>必填列：M, N, O, P</strong>（Q, R, S可留空）
                         </div>
                         
                         <div id="fileInfo" class="d-none">
@@ -575,6 +580,7 @@
                                 <ul class="mt-2">
                                     <li>若Q包含<span class="highlight">"x"</span>，则R和S中数值小的一方获得1积分</li>
                                     <li>否则，R和S中数值大的一方获得1积分</li>
+                                    <li><span class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>若Q、R或S为空，将跳过此规则，双方各得0分</span></li>
                                 </ul>
                             </li>
                         </ul>
@@ -860,10 +866,10 @@
                             <tr>
                                 <th>队伍A</th>
                                 <th>队伍B</th>
-                                <th>M</th>
-                                <th>N</th>
-                                <th>O</th>
-                                <th>P</th>
+                                <th>M <span class="text-danger">*</span></th>
+                                <th>N <span class="text-danger">*</span></th>
+                                <th>O <span class="text-danger">*</span></th>
+                                <th>P <span class="text-danger">*</span></th>
                                 <th>Q</th>
                                 <th>R</th>
                                 <th>S</th>
@@ -875,16 +881,21 @@
                 // 仅显示前10行预览
                 const previewRows = csvData.slice(0, 10);
                 previewRows.forEach(row => {
+                    // 检查必填字段是否完整
+                    const requiredFields = ['m', 'n', 'o', 'p'];
+                    const missingRequired = requiredFields.some(field => row[field] === null);
+                    const hasMissingQRS = ['q', 'r', 's'].some(field => row[field] === null || row[field] === '');
+                    
                     // 使用escapeHtml防止XSS并确保中文正确显示
                     tableHTML += `
-                        <tr>
+                        <tr class="${missingRequired ? 'table-danger' : hasMissingQRS ? 'warning-row' : ''}">
                             <td>${escapeHtml(row.teamA)}</td>
                             <td>${escapeHtml(row.teamB)}</td>
                             <td>${row.m !== null ? row.m : '<span class="empty-cell">无数据</span>'}</td>
                             <td>${row.n !== null ? row.n : '<span class="empty-cell">无数据</span>'}</td>
                             <td>${row.o !== null ? row.o : '<span class="empty-cell">无数据</span>'}</td>
                             <td>${row.p !== null ? row.p : '<span class="empty-cell">无数据</span>'}</td>
-                            <td>${escapeHtml(row.q)}</td>
+                            <td>${row.q ? escapeHtml(row.q) : '<span class="empty-cell">无数据</span>'}</td>
                             <td>${row.r !== null ? row.r : '<span class="empty-cell">无数据</span>'}</td>
                             <td>${row.s !== null ? row.s : '<span class="empty-cell">无数据</span>'}</td>
                         </tr>
@@ -896,6 +907,15 @@
                 if (csvData.length > 10) {
                     tableHTML += `<div class="text-center py-3 bg-light">显示前10行，共${csvData.length}行数据</div>`;
                 }
+                
+                // 添加图例
+                tableHTML += `
+                    <div class="mt-2 text-sm">
+                        <span class="badge bg-danger me-2">必填项缺失</span>
+                        <span class="badge bg-warning me-2">QRS有缺失</span>
+                        <span class="text-danger">*</span> 表示必填项
+                    </div>
+                `;
                 
                 previewContainer.innerHTML = tableHTML;
             }
@@ -914,12 +934,13 @@
             function processData() {
                 processedData = [];
                 teamStats = {};
-                const invalidRows = [];
+                const invalidRows = []; // 存储必填字段缺失的行
+                const warningRows = []; // 存储QRS字段缺失的行
                 
                 // 处理每一行数据
                 csvData.forEach((row, index) => {
-                    // 检查必要的数值字段是否存在
-                    const requiredFields = ['m', 'n', 'o', 'p', 'r', 's'];
+                    // 检查必填的数值字段是否存在 (M, N, O, P)
+                    const requiredFields = ['m', 'n', 'o', 'p'];
                     const missingFields = requiredFields.filter(field => row[field] === null);
                     
                     if (missingFields.length > 0) {
@@ -928,6 +949,18 @@
                             missingFields: missingFields
                         });
                         return; // 跳过处理此行数据
+                    }
+                    
+                    // 检查QRS字段是否有缺失
+                    const missingQRSFields = ['q', 'r', 's'].filter(field => 
+                        row[field] === null || row[field] === ''
+                    );
+                    
+                    if (missingQRSFields.length > 0) {
+                        warningRows.push({
+                            rowIndex: index + 1,
+                            missingFields: missingQRSFields
+                        });
                     }
                     
                     let scoreA = 0;
@@ -960,7 +993,12 @@
                     // 规则3: O等于P时处理Q,R,S
                     else {
                         ruleUsed = 3;
-                        if (row.q.toLowerCase().includes("x")) {
+                        // 检查QRS是否有缺失
+                        if (missingQRSFields.length > 0) {
+                            // QRS有缺失，双方各得0分
+                            scoreA = 0;
+                            scoreB = 0;
+                        } else if (row.q.toLowerCase().includes("x")) {
                             // x规则: 小的一方得1分
                             if (row.r < row.s) {
                                 scoreA = 1;
@@ -985,7 +1023,8 @@
                         netA: netA,
                         scoreB: scoreB,
                         netB: netB,
-                        ruleUsed: ruleUsed
+                        ruleUsed: ruleUsed,
+                        hasMissingQRS: missingQRSFields.length > 0
                     });
                     
                     // 更新队伍统计
@@ -993,13 +1032,29 @@
                     updateTeamStats(row.teamB, scoreB, netB);
                 });
                 
-                // 显示无效行警告
+                // 构建提示信息
+                let message = '';
+                
                 if (invalidRows.length > 0) {
-                    let warningMessage = `发现${invalidRows.length}行数据不完整，已跳过处理：\n`;
+                    message += `发现${invalidRows.length}行数据缺少必填字段(M,N,O,P)，已跳过处理：\n`;
                     invalidRows.forEach(item => {
-                        warningMessage += `第${item.rowIndex}行: 缺少${item.missingFields.join(', ')}字段数据\n`;
+                        message += `第${item.rowIndex}行: 缺少${item.missingFields.join(', ')}字段数据\n`;
                     });
-                    alert(warningMessage);
+                }
+                
+                if (warningRows.length > 0) {
+                    if (message) message += '\n';
+                    message += `发现${warningRows.length}行数据QRS字段不完整：\n`;
+                    message += '这些行将被处理，但如果需要应用规则3，双方可能各得0分\n';
+                    warningRows.forEach(item => {
+                        message += `第${item.rowIndex}行: 缺少${item.missingFields.join(', ')}字段数据\n`;
+                    });
+                }
+                
+                if (message) {
+                    alert(message);
+                } else {
+                    alert('所有数据均完整，已成功处理！');
                 }
                 
                 displayResults();
@@ -1093,7 +1148,8 @@
                     '净胜A': row.netA,
                     '积分B': row.scoreB,
                     '净胜B': row.netB,
-                    '使用规则': `规则${row.ruleUsed}`
+                    '使用规则': `规则${row.ruleUsed}`,
+                    'QRS是否完整': row.hasMissingQRS ? '不完整' : '完整'
                 }));
                 
                 const detailWs = XLSX.utils.json_to_sheet(detailData);
